@@ -1,13 +1,20 @@
 # Your JWT Swiss Army Knife
 
-`cjwt` is a robust and comprehensive command-line tool — your Swiss Army knife for all things JWT. Featuring intuitive commands for generating, validating, decoding, and inspecting JSON Web Tokens, cjwt streamlines token management tasks for developers and security professionals across both development and production environments.
+`cjwt` is a robust and comprehensive command-line tool — your Swiss Army knife for all things JWT.
 
-## 🚀 Quick Start
+### 🔍 JWT Decoding
 
-The simplest way to use `cjwt` is to copy a JWT to your clipboard and run:
+Decode JWTs in various formats:
 
 ```bash
+# Decode from clipboard
 cjwt
+
+# Decode from file
+cjwt decode --file token.txt
+
+# Decode from string
+cjwt decode --token "your.jwt.token"
 ```
 
 This will automatically decode and display the JWT in a colorized format.
@@ -50,21 +57,6 @@ cjwt validate --token "your.jwt.token" --secret "your-secret"
 
 # Validate with a public key
 cjwt validate --token "your.jwt.token" --public-key "path/to/public.pem"
-```
-
-### 🔍 JWT Decoding
-
-Decode JWTs in various formats:
-
-```bash
-# Decode from clipboard
-cjwt
-
-# Decode from file
-cjwt decode --file token.txt
-
-# Decode from string
-cjwt decode --token "your.jwt.token"
 ```
 
 ### ✍️ JWT Signing
@@ -165,10 +157,39 @@ cjwt create --claims '{"sub": "123"}' --pem "path/to/key.pem"
 
 ---
 
+## 🧪 Testing
+
+The project includes a comprehensive test suite to ensure all functionality works correctly.
+
+### Running Tests
+
+You can run the test suite using:
+
+```bash
+# Run all tests
+python -m tests.run_tests
+
+# Run specific test modules
+python -m unittest tests.test_decode
+python -m unittest tests.test_create_validate
+```
+
+### Test Coverage
+
+Tests cover all major functionality including:
+
+- JWT decoding and display
+- JWT creation with various algorithms
+- JWT validation and verification
+- Header inspection and claim extraction
+- Expiration handling
+- Format conversion
+- Batch processing
+
+For more details on testing, see the [tests README](tests/README.md).
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-MIT License - feel free to use this tool in any way you want!
