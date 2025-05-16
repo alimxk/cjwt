@@ -1,49 +1,32 @@
 #!/usr/bin/env python3
 
 import unittest
-import os
 import sys
+import os
 
-# Add the parent directory to the path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# Now import from tests module
-from tests.test_utils import generate_test_keys, setup_test_files
-
-
-def setup_test_environment():
-    """Set up the test environment"""
+def run_tests():
+    """Run all tests in the tests directory."""
     print("Setting up test environment...")
     
-    # Generate test keys and data files
-    generate_test_keys()
-    setup_test_files()
+    # Add the parent directory to the Python path
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     
-    print("Test environment set up successfully.")
-
-
-def discover_and_run_tests():
-    """Discover and run all tests in the tests directory"""
-    # Discover all tests
+    # Import the module to test
+    import cjwt
+    
+    print("Test environment set up successfully.\n")
+    print("Running tests...\n")
+    
+    # Discover and run all tests
     loader = unittest.TestLoader()
     start_dir = os.path.dirname(__file__)
-    suite = loader.discover(start_dir, pattern="test_*.py")
+    suite = loader.discover(start_dir, pattern='test_*.py')
     
-    # Run the tests
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     
-    # Return the number of failures and errors
-    return len(result.failures) + len(result.errors)
+    # Return appropriate exit code
+    return 0 if result.wasSuccessful() else 1
 
-
-if __name__ == "__main__":
-    # Set up test environment
-    setup_test_environment()
-    
-    # Run all tests
-    print("\nRunning tests...\n")
-    exit_code = discover_and_run_tests()
-    
-    # Exit with appropriate code
-    sys.exit(exit_code) 
+if __name__ == '__main__':
+    sys.exit(run_tests()) 

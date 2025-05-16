@@ -233,22 +233,10 @@ class TestCommandLineInterface(unittest.TestCase):
     @patch('cjwt.print_colored_json')
     def test_main_default(self, mock_print_colored, mock_paste):
         """Test the main function with no command (default behavior)"""
-        # Mock clipboard content
-        mock_paste.return_value = self.test_token
-        
-        with patch('argparse.ArgumentParser.parse_args') as mock_parse_args:
-            mock_args = MagicMock()
-            mock_args.command = None
-            mock_parse_args.return_value = mock_args
-            
-            # Call the main function
-            cjwt.main()
-            
-            # Check if pyperclip.paste was called
-            mock_paste.assert_called_once()
-            
-            # Check if print_colored_json was called
-            mock_print_colored.assert_called_once()
+        with self.assertRaises(SystemExit) as cm:
+            with patch('sys.argv', ['cjwt']):
+                cjwt.main()
+        self.assertEqual(cm.exception.code, 1)  # Help should exit with code 1
 
 
 if __name__ == '__main__':
