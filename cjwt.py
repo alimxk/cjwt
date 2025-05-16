@@ -14,6 +14,14 @@ from datetime import datetime, timezone, timedelta
 # Initialize colorama
 init()
 
+# Global variable to control color output
+USE_COLORS = True
+
+def set_color_mode(use_colors):
+    """Set whether to use colors in output."""
+    global USE_COLORS
+    USE_COLORS = use_colors
+
 def is_jwt(token):
     """Check if a string matches JWT format."""
     jwt_pattern = r'^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$'
@@ -104,6 +112,9 @@ def colorize_json(json_str):
     # First format the JSON with proper indentation
     formatted = json.dumps(json_str, indent=2)
     
+    if not USE_COLORS:
+        return formatted
+        
     # Apply colors to different parts
     colored = formatted
     # Color the keys
@@ -119,13 +130,19 @@ def colorize_json(json_str):
 
 def print_section(title, content, color=Fore.YELLOW):
     """Print a section with a title and content."""
-    print(f"\n{color}\033[1m{title}\033[0m{Style.RESET_ALL}")
+    if USE_COLORS:
+        print(f"\n{color}\033[1m{title}\033[0m{Style.RESET_ALL}")
+    else:
+        print(f"\n{title}")
     print(content)
 
 def print_colored_json(data):
     """Print JSON data with colors."""
     if isinstance(data, dict) and "error" in data:
-        print(f"{Fore.RED}Error: {data['error']}{Style.RESET_ALL}")
+        if USE_COLORS:
+            print(f"{Fore.RED}Error: {data['error']}{Style.RESET_ALL}")
+        else:
+            print(f"Error: {data['error']}")
         return
 
     # Print timestamp information
@@ -133,36 +150,43 @@ def print_colored_json(data):
     if 'exp' in payload and 'iat' in payload:
         # Get the formatted values first to calculate max length
         issued_at = format_timestamp(payload['iat'])
-        expires_at = format_timestamp(payload['exp'])
-        time_remaining = get_time_remaining(payload['exp'])
+        expires_at_val = format_timestamp(payload['exp'])
+        time_remaining_val = get_time_remaining(payload['exp'])
         
         # Add not before time if it exists
         not_before = format_timestamp(payload['nbf']) if 'nbf' in payload else None
         
         # Calculate the maximum length needed
-        max_length = max(
+        max_len = max(
             len(issued_at),
-            len(expires_at),
-            len(time_remaining),
+            len(expires_at_val),
+            len(time_remaining_val),
             len(not_before) if not_before else 0
         ) + 25  # Add padding for labels and borders
         
         # Create a formatted timestamp section
         timestamp_info = []
-        timestamp_info.append(f"┌{'─' * max_length}┐")
-        timestamp_info.append(f"│ {'Issued at:':<15} {issued_at:<{max_length-18}} │")
+        timestamp_info.append(f"┌{'─' * max_len}┐")
+        timestamp_info.append(f"│ {'Issued at:':<15} {issued_at:<{max_len-18}} │")
         
         if not_before:
-            timestamp_info.append(f"│ {'Not before:':<15} {not_before:<{max_length-18}} │")
+            timestamp_info.append(f"│ {'Not before:':<15} {not_before:<{max_len-18}} │")
         
         # Check if token is expired
         now = datetime.now(timezone.utc).timestamp()
         is_expired = payload['exp'] < now
-        exp_color = Fore.LIGHTRED_EX if is_expired else Fore.GREEN
         
-        timestamp_info.append(f"│ {'Expires at:':<15} {exp_color}{expires_at:<{max_length-18}}{Style.RESET_ALL} │")
-        timestamp_info.append(f"│ {'Time remaining:':<15} {exp_color}{time_remaining:<{max_length-18}}{Style.RESET_ALL} │")
-        timestamp_info.append(f"└{'─' * max_length}┘")
+        if USE_COLORS:
+            exp_color = Fore.LIGHTRED_EX if is_expired else Fore.GREEN
+            expires_at_str = f"{exp_color}{expires_at_val:<{max_len-18}}{Style.RESET_ALL}"
+            time_remaining_str = f"{exp_color}{time_remaining_val:<{max_len-18}}{Style.RESET_ALL}"
+        else:
+            expires_at_str = f"{expires_at_val:<{max_len-18}}"
+            time_remaining_str = f"{time_remaining_val:<{max_len-18}}"
+
+        timestamp_info.append(f"│ {'Expires at:':<15} {expires_at_str} │")
+        timestamp_info.append(f"│ {'Time remaining:':<15} {time_remaining_str} │")
+        timestamp_info.append(f"└{'─' * max_len}┘")
         
         print('\n'.join(timestamp_info))
 
@@ -173,10 +197,22 @@ def print_colored_json(data):
     print_section("Payload", colorize_json(data['payload']))
 
     # Print signature
-    print_section("Signature", f"{Fore.CYAN}{data['signature']}{Style.RESET_ALL}")
+    signature_content = data['signature']
+    if USE_COLORS:
+        signature_content = f"{Fore.CYAN}{data['signature']}{Style.RESET_ALL}"
+    print_section("Signature", signature_content)
 
 def get_token_from_source(args):
-    """Get token from specified source (clipboard, file, or directly specified)."""
+    """Get token from specified source (stdin, clipboard, file, or directly specified)."""
+    # Check if input is piped and no explicit token or file is given
+    if not sys.stdin.isatty() and args.token is None and args.file is None:
+        # Read from stdin if it's being piped
+        for line in sys.stdin:
+            line = line.strip()
+            if is_jwt(line):
+                return line
+        print(f"{Fore.RED}No JWT tokens found in stdin input.{Style.RESET_ALL}")
+        sys.exit(1)
     if hasattr(args, 'token') and args.token:
         return args.token
     elif hasattr(args, 'file') and args.file:
@@ -192,13 +228,11 @@ def get_token_from_source(args):
         if not content:
             print(f"{Fore.RED}No content found in clipboard.{Style.RESET_ALL}")
             sys.exit(1)
-        
         # Try to find a JWT in the content
         for line in content.splitlines():
             line = line.strip()
             if is_jwt(line):
                 return line
-                
         print(f"{Fore.RED}No JWT tokens found in the clipboard content.{Style.RESET_ALL}")
         sys.exit(1)
 
@@ -531,23 +565,23 @@ def cmd_batch(args):
     print(f"Processed {len(tokens)} tokens: {success_count} successful, {len(tokens) - success_count} failed")
 
 def main():
-    parser = argparse.ArgumentParser(description="cjwt - Your JWT Swiss Army Knife")
-    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    parser = argparse.ArgumentParser(description='JWT CLI Tool')
+    parser.add_argument('--no-colors', action='store_true', help='Disable colored output (useful for piping)')
+    subparsers = parser.add_subparsers(dest='command', help='Command to execute')
     
     # Decode command
-    decode_parser = subparsers.add_parser("decode", help="Decode a JWT token")
-    decode_parser.add_argument("--token", help="JWT token to decode")
-    decode_parser.add_argument("--file", help="File containing JWT token")
+    decode_parser = subparsers.add_parser('decode', help='Decode a JWT token')
+    decode_parser.add_argument('-t', '--token', help='JWT token to decode')
+    decode_parser.add_argument('-f', '--file', help='File containing JWT token')
     
     # Create command
-    create_parser = subparsers.add_parser("create", help="Create a new JWT token")
-    create_parser.add_argument("--claims", required=True, help="JSON string of claims to include")
-    create_parser.add_argument("--exp", type=int, help="Expiration time in seconds")
-    create_parser.add_argument("--secret", help="Secret key for signing")
-    create_parser.add_argument("--private-key", help="Path to private key file")
-    create_parser.add_argument("--alg", help="Algorithm to use (default: HS256)")
-    create_parser.add_argument("--jwk", help="Path to JWK file")
-    create_parser.add_argument("--pem", help="Path to PEM file")
+    create_parser = subparsers.add_parser('create', help='Create a new JWT token')
+    create_parser.add_argument('-c', '--claims', required=True, help='JSON string of claims')
+    create_parser.add_argument('-e', '--exp', type=int, help='Expiration time in seconds from now')
+    create_parser.add_argument('-a', '--alg', help='Signing algorithm (default: HS256)')
+    create_parser.add_argument('-k', '--secret', help='Secret key for signing')
+    create_parser.add_argument('-p', '--private-key', help='Path to private key file')
+    create_parser.add_argument('-j', '--jwk', help='Path to JWK file')
     
     # Validate command
     validate_parser = subparsers.add_parser("validate", help="Validate a JWT token")
@@ -610,57 +644,34 @@ def main():
     
     args = parser.parse_args()
     
+    # Set color mode based on arguments and whether stdout is a terminal
+    use_colors = not args.no_colors and sys.stdout.isatty()
+    set_color_mode(use_colors)
+    
     if not args.command:
-        # Default behavior - try to decode from clipboard
-        try:
-            content = pyperclip.paste()
-            
-            if not content:
-                print(f"{Fore.RED}No content found in clipboard.{Style.RESET_ALL}")
-                parser.print_help()
-                return
-            
-            # Split content into lines and check each line
-            lines = content.splitlines()
-            jwt_found = False
-            
-            for line in lines:
-                line = line.strip()
-                if is_jwt(line):
-                    jwt_found = True
-                    decoded = decode_jwt(line)
-                    print_colored_json(decoded)
-            
-            if not jwt_found:
-                print(f"{Fore.RED}No JWT tokens found in the clipboard content.{Style.RESET_ALL}")
-                parser.print_help()
-        except Exception as e:
-            print(f"{Fore.RED}Error: {str(e)}{Style.RESET_ALL}")
-            parser.print_help()
+        parser.print_help()
+        sys.exit(1)
+        
+    # Map commands to their handler functions
+    commands = {
+        'decode': cmd_decode,
+        'create': cmd_create,
+        'validate': cmd_validate,
+        'sign': cmd_sign,
+        'verify': cmd_verify,
+        'header': cmd_header,
+        'extract': cmd_extract,
+        'check-exp': cmd_check_exp,
+        'add-exp': cmd_add_exp,
+        'format': cmd_format,
+        'batch': cmd_batch
+    }
+    
+    if args.command in commands:
+        commands[args.command](args)
     else:
-        # Call the appropriate command handler
-        if args.command == "decode":
-            cmd_decode(args)
-        elif args.command == "create":
-            cmd_create(args)
-        elif args.command == "validate":
-            cmd_validate(args)
-        elif args.command == "sign":
-            cmd_sign(args)
-        elif args.command == "verify":
-            cmd_verify(args)
-        elif args.command == "header":
-            cmd_header(args)
-        elif args.command == "extract":
-            cmd_extract(args)
-        elif args.command == "check-exp":
-            cmd_check_exp(args)
-        elif args.command == "add-exp":
-            cmd_add_exp(args)
-        elif args.command == "format":
-            cmd_format(args)
-        elif args.command == "batch":
-            cmd_batch(args)
+        parser.print_help()
+        sys.exit(1)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main() 

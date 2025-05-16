@@ -72,18 +72,22 @@ class TestUtilityFunctions(unittest.TestCase):
 
     def test_colorize_json(self):
         """Test the colorize_json function"""
-        # Test with a simple JSON object
-        test_json = {"key": "value", "number": 42, "bool": True}
-        colored_json = cjwt.colorize_json(test_json)
+        test_data = {
+            "key": "value",
+            "number": 42,
+            "bool": True
+        }
         
-        # Check if the output contains the expected values
-        self.assertIn("key", colored_json)
-        self.assertIn("value", colored_json)
-        self.assertIn("42", colored_json)
-        self.assertIn("true", colored_json)
-        
-        # Check if the output contains color codes
+        # Test with colors enabled
+        cjwt.set_color_mode(True)
+        colored_json = cjwt.colorize_json(test_data)
         self.assertIn("\033[", colored_json)  # ANSI color code prefix
+        
+        # Test with colors disabled
+        cjwt.set_color_mode(False)
+        plain_json = cjwt.colorize_json(test_data)
+        self.assertNotIn("\033[", plain_json)  # No ANSI color codes
+        self.assertEqual(plain_json, json.dumps(test_data, indent=2))  # Should be plain JSON
 
     @patch('cjwt.read_key_file')
     def test_read_key_file(self, mock_read):
